@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Best Programming Language</title>
+    <style>
+        textarea {
+            resize: none;
+            text-align: center;
+        }
+        button {
+            width: 30px;
+        }
+        label {
+            font-weight: bold;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Vote for the best programming language</h1><br>
+    <ul>
+        <li>
+            <label for="java">JAVA</label>
+            <button onclick="changeValue(this, 1)">+</button>
+            <button onclick="changeValue(this, -1)">-</button>
+            <textarea id="java" rows="1" cols="10">0</textarea>
+            <br><br>
+        </li>
+        <li>
+            <label for="c">C</label>
+            <button onclick="changeValue(this, 1)">+</button>
+            <button onclick="changeValue(this, -1)">-</button>
+            <textarea id="c" rows="1" cols="10">0</textarea>
+            <br><br>
+        </li>
+        <li>
+            <label for="cpp">C++</label>
+            <button onclick="changeValue(this, 1)">+</button>
+            <button onclick="changeValue(this, -1)">-</button>
+            <textarea id="cpp" rows="1" cols="10">0</textarea>
+            <br><br>
+        </li>
+        <li>
+            <label for="python">Python</label>
+            <button onclick="changeValue(this, 1)">+</button>
+            <button onclick="changeValue(this, -1)">-</button>
+            <textarea id="python" rows="1" cols="10">0</textarea>
+            <br><br>
+        </li>
+        <li>
+            <label for="go">Go</label>
+            <button onclick="changeValue(this, 1)">+</button>
+            <button onclick="changeValue(this, -1)">-</button>
+            <textarea id="go" rows="1" cols="10">0</textarea>
+            <br><br>
+        </li>
+        <li>
+            <label for="rust">Rust</label>
+            <button onclick="changeValue(this, 1)">+</button>
+            <button onclick="changeValue(this, -1)">-</button>
+            <textarea id="rust" rows="1" cols="10">0</textarea>
+            <br><br>
+        </li>
+        <li>
+            <label for="js">JavaScript</label>
+            <button onclick="changeValue(this, 1)">+</button>
+            <button onclick="changeValue(this, -1)">-</button>
+            <textarea id="js" rows="1" cols="10">0</textarea>
+            <br><br>
+        </li>
+    </ul>
+
+    <script>
+        function changeValue(button, delta) {
+            const textarea = button.parentElement.querySelector("textarea");
+            let currentValue = parseInt(textarea.value) || 0;
+            currentValue += delta;
+            if (currentValue < 0) currentValue = 0; // prevent negative numbers
+            textarea.value = currentValue;
+        }
+    </script>
+</body>
+</html>
