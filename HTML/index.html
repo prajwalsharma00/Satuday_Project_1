@@ -71,6 +71,7 @@
             <br><br>
         </li>
     </ul>
+    <button onClick="SubmitVotes()" style="font-size: 20px; padding: 10px 20px;width:150px;">Submit</button>
 
     <script>
         function changeValue(button, delta) {
@@ -80,6 +81,35 @@
             if (currentValue < 0) currentValue = 0; // prevent negative numbers
             textarea.value = currentValue;
         }
+        function SubmitVotes(){
+    const ids = ["java", "c", "cpp", "python", "go", "rust", "js"];
+    const votes = {};
+    ids.forEach(id => {
+        const value = parseInt(document.getElementById(id).value) || 0;
+        votes[id] = value;
+    });
+
+    // Send to server
+    fetch('http://localhost:8080/submit', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(votes)
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("Server response:", data);
+        alert("Votes submitted successfully!");
+    })
+    .catch(error => {
+        console.error("Error submitting votes:", error);
+        alert("Failed to submit votes. Please try again.");
+    });
+}
+
+    
+
     </script>
 </body>
 </html>

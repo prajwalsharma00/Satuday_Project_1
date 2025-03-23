@@ -1,5 +1,5 @@
 #include "server.h"
-#define LOG "files.log"
+#define LOG "files.csv"
 struct client_info
 {
     SOCKET client;
@@ -11,6 +11,7 @@ static struct client_info *main_list = 0;
 struct client_info *get_client(SOCKET s)
 {
     struct client_info *temp = main_list;
+
     while (temp)
     {
         if (temp->client == s)
@@ -25,18 +26,51 @@ struct client_info *get_client(SOCKET s)
     main_list = new;
     return new;
 }
-
-void drop_client(SOCKET s)
+void store_it(char *request)
 {
-    if (!get_client(s))
+    FILE *fp = fopen("log.txt", "w");
+    fseek(fp, 0, SEEK_SET);
+    if (!fp)
     {
-        printf("NO SUCH CLIENT PRESENT ... \n");
+        printf("Unable to opne the file... \n");
         return;
     }
-    struct client_info *next = main_list;
-    while (next)
+    char *actual_data = strstr(request, "\r\n\r\n");
+    if (actual_data)
     {
-        struct client_info *nextnode = next->next;
+        fputs(actual_data + 4, fp);
+    }
+    else
+    {
+        fputs(request, fp);
+    }
+
+    fclose(fp);
+}
+
+int numberofnodes(struct client_info *temp)
+{
+    int value = 0;
+    while (temp)
+    {
+        value++;
+        temp = temp->next;
+    }
+    return value;
+}
+void drop_client(struct client_info *client)
+{
+    CLOSESOCKET(client->client);
+    struct client_info **p = &main_list;
+    while (*p)
+    {
+        if (*p == client)
+        {
+            *p = client->next;
+            free(client);
+            return;
+        }
+        p = &(*p)->next;
     }
 }
 
@@ -84,6 +118,37 @@ SOCKET create_socket(char *host, char *port)
     }
     return s;
 }
+char *sendresponse(char *data)
+{
+    char *response = malloc(1024);
+
+    sprintf(response,
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: application/json\r\n"
+            "\r\n"
+            "{\"status\": \"%s\"}",
+            data);
+
+    return response;
+}
+void send_post_data(SOCKET s, char *path)
+{
+    char *response;
+    if (strstr(path, "submit"))
+    {
+
+        response = sendresponse("Sucess");
+    }
+    else
+    {
+        printf("the response is %s \n", response);
+        response = sendresponse("failure");
+    }
+    printf("The response is %s \n", response);
+
+    send(s, response, strlen(response), 0);
+    free(response);
+}
 void send_data(SOCKET s, char *path)
 
 {
@@ -95,12 +160,12 @@ void send_data(SOCKET s, char *path)
     if (!fp)
     {
         printf("NO such file is presnt .. \n");
-        const char *data = "HTTP/1.1 404 Page Not Found\r\n"
+        const char *data = "HTTP/1.1 404 Not Found\r\n"
                            "Content-Type: text/html\r\n"
                            "Content-length: 16\r\n\r\n";
         send(s, data, strlen(data), 0);
         send(s, "Page Not Found!\r\n", 18, 0);
-        exit(1);
+        return;
     }
     fseek(fp, 0, SEEK_SET);
     char buffer[1024];
@@ -122,6 +187,21 @@ void send_data(SOCKET s, char *path)
     send(s, last_part, 5, 0);
 }
 
+void parserequest(char *request, SOCKET s, char *path)
+{
+    if (strstr(request, "GET"))
+
+    {
+
+        send_data(s, path);
+    }
+    else
+    {
+        store_it(request);
+        send_post_data(s, path);
+    }
+}
+
 int main()
 {
     SOCKET s;
@@ -138,17 +218,21 @@ int main()
     while (1)
     {
         fd_set master = reads;
-        if (select(max + 1, &reads, 0, 0, 0) < 0)
+        struct timeval ts;
+        ts.tv_sec = 0;
+        ts.tv_usec = 500000;
+        if (select(max + 1, &master, 0, 0, &ts) < 0)
         {
             fprintf(stderr, "Nothing to connect at teh moment .. \n");
-            exit(1);
+            break;
         }
         if (FD_ISSET(s, &master))
         {
-            printf("Reached till here \n");
+            printf("New Connection is established.... \n");
             struct client_info *clients = get_client(-1);
 
             clients->client = accept(s, (struct sockaddr *)&(clients->clientaddress), &clients->clientlen);
+            printf("The new client excepted is %d \n", clients->client);
             if (!ISSOCKETVALID(clients->client))
             {
                 fprintf(stderr, "NEW CONNECTION :: ERROR\n");
@@ -159,36 +243,60 @@ int main()
             FD_SET(clients->client, &reads);
         }
         struct client_info *temp = main_list;
+        printf("the number of connection at the node is %d \n", numberofnodes(temp));
         while (temp)
         {
-            printf("the socket for this is %d \n", temp->client);
-            if (FD_ISSET(temp->client, &reads))
+
+            if (FD_ISSET(temp->client, &master))
             {
+                printf("int the f statenmet .. \n");
+                printf("The ready client is %d \n", temp->client);
                 char Client_request[2048];
                 int recv_data = recv(temp->client, Client_request, sizeof(Client_request), 0);
+                if (recv_data <= 0)
+                {
+                    printf("Client disconnected: %d\n", temp->client);
+
+                    CLOSESOCKET(temp->client);
+                    FD_CLR(temp->client, &reads);
+                    drop_client(temp);
+                    // Remove from main set
+                    // remove from main_list too
+                }
                 printf("The client request is %s \n", Client_request);
                 char *path = strstr(Client_request, "/");
                 char *end_path = strstr(path, " HTTP/1.1");
                 int length = end_path - (path + 1);
+                char new_path[1024];
+                strncpy(new_path, path + 1, length);
                 printf("the length is %d \n", length);
                 if (length == 0)
                 {
-                    send_data(temp->client, "index.html");
+                    parserequest(Client_request, temp->client, "index.html");
                 }
                 else
                 {
                     printf("teh length is %d \n", length);
-                    char new_path[1024];
-                    strncpy(new_path, path + 1, length);
 
                     printf("The path is %s \n", new_path);
-                    send_data(temp->client, new_path);
+                    parserequest(Client_request, temp->client, new_path);
                 }
 
                 printf("html send to the client ... \n");
             }
+
             temp = temp->next;
         }
+    }
+
+    struct client_info *temp = main_list;
+    struct client_info *next;
+    while (temp)
+    {
+
+        next = temp->next;
+        drop_client(temp);
+        temp = next;
     }
 
     CLOSESOCKET(s);
