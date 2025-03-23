@@ -84,11 +84,25 @@ SOCKET create_socket(char *host, char *port)
     }
     return s;
 }
-void send_data(SOCKET s)
+void send_data(SOCKET s, char *path)
 
 {
     printf("Sendign data .... \n");
-    FILE *fp = fopen("../HTML/index.html", "r");
+    char full_path[1024];
+    sprintf(full_path, "../HTML/%s", path);
+    FILE *fp = fopen(full_path, "r");
+
+    if (!fp)
+    {
+        printf("NO such file is presnt .. \n");
+        const char *data = "HTTP/1.1 404 Page Not Found\r\n"
+                           "Content-Type: text/html\r\n"
+                           "Content-length: 16\r\n\r\n";
+        send(s, data, strlen(data), 0);
+        send(s, "Page Not Found!\r\n", 18, 0);
+        exit(1);
+    }
+    fseek(fp, 0, SEEK_SET);
     char buffer[1024];
     const char *data = "HTTP/1.1 200 OK\r\n"
                        "Content-Type: text/html\r\n"
@@ -150,7 +164,27 @@ int main()
             printf("the socket for this is %d \n", temp->client);
             if (FD_ISSET(temp->client, &reads))
             {
-                send_data(temp->client);
+                char Client_request[2048];
+                int recv_data = recv(temp->client, Client_request, sizeof(Client_request), 0);
+                printf("The client request is %s \n", Client_request);
+                char *path = strstr(Client_request, "/");
+                char *end_path = strstr(path, " HTTP/1.1");
+                int length = end_path - (path + 1);
+                printf("the length is %d \n", length);
+                if (length == 0)
+                {
+                    send_data(temp->client, "index.html");
+                }
+                else
+                {
+                    printf("teh length is %d \n", length);
+                    char new_path[1024];
+                    strncpy(new_path, path + 1, length);
+
+                    printf("The path is %s \n", new_path);
+                    send_data(temp->client, new_path);
+                }
+
                 printf("html send to the client ... \n");
             }
             temp = temp->next;
