@@ -72,6 +72,7 @@
         </li>
     </ul>
     <button onClick="SubmitVotes()" style="font-size: 20px; padding: 10px 20px;width:150px;">Submit</button>
+    <button onClick="Download()" style="font-size:20px;width:150px;padding:20px">Download</button>
 
     <script>
         function changeValue(button, delta) {
@@ -82,9 +83,9 @@
             textarea.value = currentValue;
         }
         function SubmitVotes(){
-    const ids = ["java", "c", "cpp", "python", "go", "rust", "js"];
-    const votes = {};
-    ids.forEach(id => {
+        const ids = ["java", "c", "cpp", "python", "go", "rust", "js"];
+        const votes = {};
+             ids.forEach(id => {
         const value = parseInt(document.getElementById(id).value) || 0;
         votes[id] = value;
     });
@@ -106,9 +107,37 @@
         console.error("Error submitting votes:", error);
         alert("Failed to submit votes. Please try again.");
     });
+
+}
+function Download() {
+    fetch("http://localhost:8080/download", {
+        method: 'GET',
+        headers: {
+            'Connection': "close",
+            'X-User-Agent': 'Prajwal site',
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error("Network response was not ok!");
+        }
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a'); // ✅ FIXED
+        a.href = url;
+        a.download = "data.csv";
+        document.body.appendChild(a); // ✅ FIXED
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+    })
+    .catch(error => {
+        console.error("Error downloading the file: ", error);
+    });
 }
 
-    
 
     </script>
 </body>

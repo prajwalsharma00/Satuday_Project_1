@@ -28,17 +28,34 @@ struct client_info *get_client(SOCKET s)
 }
 void store_it(char *request)
 {
-    FILE *fp = fopen("log.txt", "w");
+    FILE *fp = fopen("log.csv", "w");
     fseek(fp, 0, SEEK_SET);
     if (!fp)
     {
         printf("Unable to opne the file... \n");
         return;
     }
-    char *actual_data = strstr(request, "\r\n\r\n");
+    char *new_data = strstr(request, "\r\n\r\n");
+    char *actual_data;
+    strncpy(actual_data, new_data, strlen(new_data) - 1);
+    char *saveptr1, *saveptr2;
     if (actual_data)
     {
-        fputs(actual_data + 4, fp);
+        char *token = strtok_r(actual_data + 5, ",", &saveptr1);
+        while (token != NULL)
+        {
+            fprintf(stdout, "%s\n", token);
+            char *data = strtok_r(token, ":", &saveptr2);
+            while (data != NULL)
+            {
+                fprintf(fp, "%s,\t", data);
+
+                printf("%s\n", data);
+                data = strtok_r(NULL, ":", &saveptr2);
+            }
+            fprintf(fp, "\n");
+            token = strtok_r(NULL, ",", &saveptr1);
+        }
     }
     else
     {
@@ -124,6 +141,7 @@ char *sendresponse(char *data)
 
     sprintf(response,
             "HTTP/1.1 200 OK\r\n"
+            "Server: Prajwal_C_Server\r\n"
             "Content-Type: application/json\r\n"
             "\r\n"
             "{\"status\": \"%s\"}",
@@ -149,6 +167,7 @@ void send_post_data(SOCKET s, char *path)
     send(s, response, strlen(response), 0);
     free(response);
 }
+
 void send_data(SOCKET s, char *path)
 
 {
@@ -161,6 +180,7 @@ void send_data(SOCKET s, char *path)
     {
         printf("NO such file is presnt .. \n");
         const char *data = "HTTP/1.1 404 Not Found\r\n"
+                           "Server: Prajwal_C_Server\r\n"
                            "Content-Type: text/html\r\n"
                            "Content-length: 16\r\n\r\n";
         send(s, data, strlen(data), 0);
@@ -170,6 +190,7 @@ void send_data(SOCKET s, char *path)
     fseek(fp, 0, SEEK_SET);
     char buffer[1024];
     const char *data = "HTTP/1.1 200 OK\r\n"
+                       "Server: Prajwal_C_Server\r\n"
                        "Content-Type: text/html\r\n"
                        "Transfer-Encoding: chunked\r\n\r\n";
     send(s, data, strlen(data), 0);
@@ -186,19 +207,70 @@ void send_data(SOCKET s, char *path)
     char *last_part = "0\r\n\r\n";
     send(s, last_part, 5, 0);
 }
+void send_csv(SOCKET s)
+{
 
+    FILE *fp = fopen("log.csv", "r");
+    if (!fp)
+    {
+        char *response = "HTTP/1.1 500 Internal Server Error \r\n\r\n";
+        send(s, response, strlen(response), 0);
+        return;
+    }
+    fseek(fp, 0, SEEK_END);
+    size_t data_size = ftell(fp);
+    printf("The size of cdv is %ld \n", data_size);
+    fseek(fp, 0, SEEK_SET);
+
+    char response[1024];
+    sprintf(response,
+            "HTTP/1.1 200 OK\r\n"
+            "Content-Type: text/csv\r\n"
+            "Server: Prajwal_C_Server\r\n"
+            "Content-Disposition: attachment; filename=\"log.csv\"\r\n"
+            "Content-Length: %zu\r\n"
+            "Connection: close\r\n"
+            "\r\n",
+            data_size); // End of headers
+    printf("The response is %s \n", response);
+    send(s, response, strlen(response), 0);
+    char data[1024];
+    size_t bytes_read;
+    while ((bytes_read = fread(data, 1, sizeof(data), fp)) > 0)
+    {
+        printf("The data is %s \n", data);
+        if (send(s, data, bytes_read, 0) < 0)
+        {
+            perror("Error in sending the data .. \n");
+            break;
+        }
+    }
+    fclose(fp);
+}
 void parserequest(char *request, SOCKET s, char *path)
 {
     if (strstr(request, "GET"))
 
     {
+        if (strstr(request, "download"))
+        {
+            printf("SEndign the csv file");
 
-        send_data(s, path);
+            send_csv(s);
+            return;
+        }
+        else
+        {
+            send_data(s, path);
+            return;
+        }
     }
     else
     {
         store_it(request);
+
         send_post_data(s, path);
+        return;
     }
 }
 
